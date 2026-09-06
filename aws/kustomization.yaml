@@ -23,17 +23,17 @@ resources:
 # É este bloco que o pipeline de CI atualiza com a tag do commit (GitOps).
 images:
   - name: auth-service
-    newName: 010533939486.dkr.ecr.us-east-1.amazonaws.com/togglemaster/auth-service
+    newName: 415764219943.dkr.ecr.us-east-1.amazonaws.com/togglemaster/auth-service
     newTag: latest
   - name: flag-service
-    newName: 010533939486.dkr.ecr.us-east-1.amazonaws.com/togglemaster/flag-service
+    newName: 415764219943.dkr.ecr.us-east-1.amazonaws.com/togglemaster/flag-service
     newTag: latest
   - name: targeting-service
-    newName: 010533939486.dkr.ecr.us-east-1.amazonaws.com/togglemaster/targeting-service
+    newName: 415764219943.dkr.ecr.us-east-1.amazonaws.com/togglemaster/targeting-service
     newTag: latest
   - name: evaluation-service
-    newName: 010533939486.dkr.ecr.us-east-1.amazonaws.com/togglemaster/evaluation-service
+    newName: 415764219943.dkr.ecr.us-east-1.amazonaws.com/togglemaster/evaluation-service
     newTag: latest
   - name: analytics-service
-    newName: 010533939486.dkr.ecr.us-east-1.amazonaws.com/togglemaster/analytics-service
+    newName: 415764219943.dkr.ecr.us-east-1.amazonaws.com/togglemaster/analytics-service
     newTag: latest

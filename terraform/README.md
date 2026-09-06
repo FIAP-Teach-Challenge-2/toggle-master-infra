@@ -50,7 +50,7 @@ Os três estados (`bootstrap/`, `infra/`, `platform/`) ficam no bucket S3 — ne
 - Credenciais do AWS Academy exportadas no terminal (**AWS Details → AWS CLI** no Learner Lab: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`). Elas expiram a cada sessão do lab.
 - Região `us-east-1` (padrão do Academy).
 
-> **Windows PowerShell 5.1**: não use `>` para gravar arquivos que o Terraform lê (gera UTF-16). Use `Out-File -Encoding ascii` como mostrado abaixo, ou rode tudo no Git Bash. O operador `&&` também não existe no PowerShell 5.1: rode um comando por linha.
+> **Windows PowerShell 5.1**: não use `>` para gravar arquivos que o Terraform lê (gera UTF-16). Use `Out-File -Encoding ascii` como mostrado abaixo, ou rode tudo no Git Bash. O operador `&&` também não existe no PowerShell 5.1: rode um comando por linha. E coloque aspas em `-backend-config="backend.hcl"`: sem elas o PowerShell separa o `.hcl` em outro argumento e o Terraform responde `Too many command line arguments`.
 
 ## Passo a passo
 
@@ -63,6 +63,8 @@ cd bootstrap
 terraform init
 terraform apply
 ```
+
+> **Por que o bucket é criado pela AWS CLI dentro do apply (`terraform_data` + `aws s3api create-bucket`) e não por um `aws_s3_bucket`?** A SCP do AWS Academy nega `s3:GetBucketObjectLockConfiguration`, e o provider lê essa configuração ao criar o recurso, falhando com `AccessDenied ... explicit deny in a service control policy`. Versionamento, criptografia e bloqueio de acesso público continuam como recursos nativos. O comando é idempotente em `us-east-1`.
 
 Gere o `backend.hcl` dos três stacks (contém só `bucket = "toggle-master-tfstate-<ACCOUNT_ID>"`):
 
@@ -269,6 +271,8 @@ Em suporte estendido o control plane custa US$ 0,60/h (~US$ 438/mês); mantenha 
 
 | Sintoma | Causa provável | Ação |
 |---|---|---|
+| `AccessDenied ... s3:GetBucketObjectLockConfiguration ... service control policy` no bootstrap | Versão antiga do `bootstrap/main.tf` com `aws_s3_bucket` (a SCP do Academy nega essa leitura) | Atualize o código; se o bucket ficou *tainted* no estado, `terraform state rm aws_s3_bucket.tfstate` e rode o apply de novo |
+| `Too many command line arguments. Did you mean to use -chdir?` no `terraform init` | PowerShell separou `.hcl` de `-backend-config=backend` | Use aspas: `-backend-config="backend.hcl"` |
 | `Invalid character encoding` no `terraform init` | `backend.hcl` gravado em UTF-16 pelo `>` do Windows PowerShell 5.1 | Regrave com `Out-File -Encoding ascii` ou use Git Bash |
 | `terraform apply` do bootstrap "criou" um bucket que já existia | Apply repetido na mesma conta (`us-east-1` não devolve `BucketAlreadyOwnedByYou`) | Apague o `terraform.tfstate` local do bootstrap e use `terraform init -backend-config=backend.hcl` para ler o estado migrado |
 | `Failed to get existing workspaces: S3 bucket ... does not exist` no `terraform init` | `backend.hcl` aponta para o ID de outra conta (credenciais de um membro diferente), ou você está subindo o bootstrap numa conta nova com o `backend.tf` já versionado | Exporte as credenciais da conta que rodou o bootstrap; ou, na conta nova, renomeie `backend.tf` → `backend.tf.migrate`, faça o apply local e migre de novo |
