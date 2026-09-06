@@ -1,6 +1,9 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+# Agrega tudo para depuração sem o Argo CD (kubectl apply -k aws).
+# Registry/tag das imagens ficam no kustomization.yaml de cada serviço em
+# aws/apps/<serviço>/ (uma Application do Argo CD cada); é lá que o CI grava a tag.
 namespace: toggle-master
 
 resources:
@@ -10,32 +13,3 @@ resources:
 - apps/targeting-service
 - apps/evaluation-service
 - apps/analytics-service
-  - db-init-jobs.yaml
-  - apps/auth-service.yaml
-  - apps/flag-service.yaml
-  - apps/targeting-service.yaml
-  - apps/evaluation-service.yaml
-  - apps/analytics-service.yaml
-  - ingress.yaml
-  - hpa.yaml
-
-# Registry e tag das imagens em um único lugar (os Deployments usam só o nome
-# do serviço). Troque o ID da conta pelo output `account_id` do stack infra ou
-# rode: kustomize edit set image auth-service=<registry>/togglemaster/auth-service:<tag>
-# É este bloco que o pipeline de CI atualiza com a tag do commit (GitOps).
-images:
-  - name: auth-service
-    newName: 415764219943.dkr.ecr.us-east-1.amazonaws.com/togglemaster/auth-service
-    newTag: latest
-  - name: flag-service
-    newName: 415764219943.dkr.ecr.us-east-1.amazonaws.com/togglemaster/flag-service
-    newTag: latest
-  - name: targeting-service
-    newName: 415764219943.dkr.ecr.us-east-1.amazonaws.com/togglemaster/targeting-service
-    newTag: latest
-  - name: evaluation-service
-    newName: 415764219943.dkr.ecr.us-east-1.amazonaws.com/togglemaster/evaluation-service
-    newTag: latest
-  - name: analytics-service
-    newName: 415764219943.dkr.ecr.us-east-1.amazonaws.com/togglemaster/analytics-service
-    newTag: latest
