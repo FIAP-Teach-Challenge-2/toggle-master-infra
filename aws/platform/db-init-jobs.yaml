@@ -68,6 +68,9 @@ kind: Job
 metadata:
   name: flag-db-init
   namespace: toggle-master
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
   backoffLimit: 5
   template:
@@ -108,6 +111,9 @@ kind: Job
 metadata:
   name: targeting-db-init
   namespace: toggle-master
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
   backoffLimit: 5
   template:
@@ -148,6 +154,9 @@ kind: Job
 metadata:
   name: auth-db-init
   namespace: toggle-master
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
   backoffLimit: 5
   template:

@@ -3,7 +3,7 @@
 Infraestrutura como código do ecossistema de microsserviços **ToggleMaster** na AWS (**EKS**), com alvo no **AWS Academy** (`LabRole`, sem criação de IAM).
 
 - **`terraform/`** — provisiona toda a infraestrutura AWS (VPC, EKS, 3× RDS, Redis, DynamoDB, SQS, ECR) e cria o Namespace/Secret/ConfigMaps e os add-ons no cluster. Leia o [`terraform/README.md`](terraform/README.md).
-- **`aws/`** — manifests Kubernetes (Kustomize) dos 5 microsserviços: Deployments, Services, Jobs de init dos bancos, Ingress nginx e HPA.
+- **`aws/`** — manifests Kubernetes (Kustomize) dos 5 microsserviços e as Applications do Argo CD. Leia o [`docs/CD-GITOPS.md`](docs/CD-GITOPS.md).
 
 ## Estrutura
 
@@ -12,15 +12,16 @@ toggle-master-infra/
 ├── terraform/
 │   ├── bootstrap/            # bucket S3 do estado remoto (use_lockfile)
 │   ├── infra/                # VPC, EKS (LabRole), RDS x3, ElastiCache, DynamoDB, SQS, ECR
-│   ├── platform/             # namespace, Secret, ConfigMaps, metrics-server, ingress-nginx
+│   ├── platform/             # namespace, Secret, ConfigMaps, metrics-server, ingress-nginx, Argo CD
 │   └── modules/              # networking, eks, rds, elasticache, dynamodb, sqs, ecr
+├── .github/workflows/
+│   └── gitops-bump.yml       # o CI chama daqui para gravar a tag da imagem
 └── aws/
-    ├── db-init-jobs.yaml     # ConfigMaps SQL (flag/targeting) + 3 Jobs psql
-    ├── apps/                 # Deployment + Service de cada serviço (portas 8001–8005)
-    ├── ingress.yaml          # Nginx Ingress (roteamento por path)
-    ├── hpa.yaml              # HPA por CPU (evaluation + analytics)
+    ├── platform/             # Jobs de init, Ingress e HPA — uma Application
+    ├── apps/<serviço>/       # Deployment + Service + kustomization — uma Application cada
+    ├── argocd/applications/  # as 6 Applications do Argo CD
     ├── keda/                 # exemplo KEDA (opcional; exige IRSA, fora do Academy)
-    └── kustomization.yaml    # recursos + bloco images: (registry/tag em um só lugar)
+    └── kustomization.yaml    # agrega tudo (fallback sem Argo CD)
 ```
 
 ## Arquitetura implantada
@@ -65,7 +66,7 @@ Publique as 5 imagens nos repositórios ECR criados:
 terraform -chdir=terraform/infra output ecr_repository_urls
 ```
 
-Os repositórios ECR seguem o padrão `togglemaster/<serviço>` (ex.: `togglemaster/auth-service`), o mesmo usado no código e no CI. Os Deployments referenciam só o nome do serviço (`auth-service:latest`); registry, namespace e tag ficam no bloco `images:` de `aws/kustomization.yaml`. Se o ID da conta for diferente de `010533939486`, troque-o lá (ou use `kustomize edit set image auth-service=<registry>/togglemaster/auth-service:<tag>` — o mesmo comando que o CI usará para gravar a tag do commit).
+Os repositórios ECR seguem o padrão `togglemaster/<serviço>` (ex.: `togglemaster/auth-service`), o mesmo usado no código e no CI. Os Deployments referenciam só o nome do serviço (`auth-service:latest`); registry e tag ficam no bloco `images:` de `aws/apps/<serviço>/kustomization.yaml` — um por serviço, porque cada um é uma Application independente do Argo CD. É esse bloco que o CI reescreve com `kustomize edit set image auth-service=<registry>/togglemaster/auth-service:<tag>`. Se o ID da conta for diferente de `010533939486`, a primeira execução do CI corrige sozinha.
 
 ### 3. Workloads
 
@@ -116,6 +117,16 @@ curl -k "https://$LB/evaluate?user_id=user-123&flag_name=nova-home"
 - **Segredos**: nenhum valor real é versionado. Senhas do RDS e chaves da aplicação são geradas pelo Terraform e vivem no estado remoto (S3 criptografado) e no Secret do cluster. Os três estados (bootstrap, infra, platform) ficam no S3.
 - **Custo**: ~US$ 8/dia com tudo ligado. Destrua (`platform` → `infra`) depois da demo.
 
+## Entrega Contínua (CD) & GitOps
+
+O Argo CD é instalado pelo `terraform/platform` e monitora este repositório: cada
+serviço é uma Application apontando para `aws/apps/<serviço>/`, com `automated`,
+`prune` e `selfHeal`. O CI dos microsserviços chama
+`.github/workflows/gitops-bump.yml` ao final do pipeline, que grava a tag da
+imagem no `kustomization.yaml` correspondente — nenhum pipeline tem credencial de
+cluster. Detalhes em [`docs/CD-GITOPS.md`](docs/CD-GITOPS.md).
+
 ## Próximas etapas do Tech Challenge (fora deste diretório)
 
-Pipelines de CI DevSecOps (GitHub Actions por serviço), repositório GitOps com atualização automática da tag da imagem (bloco `images:` do `kustomization.yaml`) e ArgoCD sincronizando os 5 serviços.
+Pipelines de CI DevSecOps (GitHub Actions por serviço), que passam a chamar o
+workflow de GitOps deste repositório.
