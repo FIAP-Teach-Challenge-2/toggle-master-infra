@@ -1,13 +1,15 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Namespace, Secret `toggle-master-secrets`, ConfigMap `toggle-master-config`
-# e ConfigMap `auth-db-init-sql` são criados pelo Terraform
-# (terraform/platform) a partir dos endpoints reais da infraestrutura.
-# Aplique este kustomization somente depois de `terraform apply` no platform.
 namespace: toggle-master
 
 resources:
+- platform
+- apps/auth-service
+- apps/flag-service
+- apps/targeting-service
+- apps/evaluation-service
+- apps/analytics-service
   - db-init-jobs.yaml
   - apps/auth-service.yaml
   - apps/flag-service.yaml
