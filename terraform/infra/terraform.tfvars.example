@@ -1,0 +1,26 @@
+# Copie para terraform.tfvars e ajuste. Todos os valores têm default sensato.
+
+aws_region    = "us-east-1"
+project       = "toggle-master"
+environment   = "dev"
+lab_role_name = "LabRole" # AWS Academy
+
+# --- EKS ---
+eks_cluster_version     = "1.35" # suporte padrão até 2027-03-27
+eks_node_instance_types = ["t3.medium"]
+eks_node_desired_size   = 2
+eks_node_min_size       = 1
+eks_node_max_size       = 3
+
+# --- Modo econômico (sem NAT Gateway, nós em subnets públicas) ---
+# enable_nat_gateway          = false
+# eks_nodes_in_public_subnets = true
+
+# --- Bancos ---
+rds_instance_class = "db.t3.micro"
+# rds_storage_type = "gp2" # se o Learner Lab recusar gp3
+redis_node_type    = "cache.t3.micro"
+
+tags = {
+  Owner = "grupo-fiap"
+}

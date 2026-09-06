@@ -1,0 +1,21 @@
+# Copie para terraform.tfvars e ajuste. Precisa bater com o stack infra.
+
+aws_region  = "us-east-1"
+project     = "toggle-master"
+environment = "dev"
+
+# Vazio = <project>-tfstate-<account_id> (o mesmo bucket do backend.hcl)
+state_bucket = ""
+
+namespace = "toggle-master"
+
+# Deixe vazio para gerar chaves aleatórias (recomendado).
+# master_key      = ""
+# service_api_key = ""
+
+install_metrics_server = true
+install_ingress_nginx  = true
+
+# Versões dos charts (fixadas nos defaults; ajuste se precisar)
+# metrics_server_chart_version = "3.13.1"
+# ingress_nginx_chart_version  = "4.15.1"

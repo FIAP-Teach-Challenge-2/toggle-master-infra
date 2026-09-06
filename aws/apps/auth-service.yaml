@@ -1,4 +1,4 @@
-﻿apiVersion: apps/v1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: auth-service
@@ -15,10 +15,18 @@ spec:
       labels:
         app: auth-service
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: auth-service
-          image: 010533939486.dkr.ecr.us-east-1.amazonaws.com/auth-service:latest
+          image: auth-service:latest
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 8001
           env:

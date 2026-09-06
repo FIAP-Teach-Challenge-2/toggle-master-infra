@@ -1,4 +1,4 @@
-﻿apiVersion: apps/v1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: targeting-service
@@ -15,10 +15,18 @@ spec:
       labels:
         app: targeting-service
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: targeting-service
-          image: 010533939486.dkr.ecr.us-east-1.amazonaws.com/targeting-service:latest
+          image: targeting-service:latest
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 8003
           env:

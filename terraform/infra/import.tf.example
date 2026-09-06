@@ -1,0 +1,38 @@
+# ---------------------------------------------------------------------------
+# Recursos da Fase 2 criados à mão que têm nome fixo (global na conta) e
+# colidiriam com os que o Terraform quer criar. Se eles ainda existirem na
+# conta, adote-os no estado em vez de apagá-los (preserva as imagens no ECR):
+#
+#   1. copie este arquivo para import.tf e ajuste o ID da conta na URL da fila;
+#   2. terraform plan   -> mostra "N to import";
+#   3. terraform apply  -> adota os recursos e alinha os atributos (SSE, DLQ...);
+#   4. apague o import.tf (os blocos são de uso único).
+#
+# Os demais recursos (RDS, Redis, EKS) usam prefixo <project>-<environment>
+# e não colidem com os manuais.
+# ---------------------------------------------------------------------------
+
+import {
+  to = module.dynamodb.aws_dynamodb_table.this
+  id = "ToggleMasterAnalytics"
+}
+
+import {
+  to = module.sqs.aws_sqs_queue.this
+  id = "https://sqs.us-east-1.amazonaws.com/<ACCOUNT_ID>/toggle-master-evaluations"
+}
+
+import {
+  for_each = toset(["togglemaster/auth-service", "togglemaster/flag-service", "togglemaster/targeting-service", "togglemaster/evaluation-service", "togglemaster/analytics-service"])
+  to       = module.ecr.aws_ecr_repository.this[each.key]
+  id       = each.key
+}
+
+# Só se o log group do control plane tiver sido recriado pelo EKS depois de um
+# `terraform destroy` anterior (o EKS entrega os últimos logs por alguns minutos
+# e recria o grupo fora do estado) ou sobrado de um cluster manual homônimo.
+# Alternativa: aws logs delete-log-group --log-group-name /aws/eks/toggle-master-dev-eks/cluster
+# import {
+#   to = module.eks.aws_cloudwatch_log_group.cluster[0]
+#   id = "/aws/eks/toggle-master-dev-eks/cluster"
+# }

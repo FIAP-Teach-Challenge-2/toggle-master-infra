@@ -1,0 +1,7 @@
+# Copie para terraform.tfvars e ajuste se necessário.
+aws_region  = "us-east-1"
+project     = "toggle-master"
+environment = "dev"
+
+# Deixe vazio para usar <project>-tfstate-<account_id>
+bucket_name = ""

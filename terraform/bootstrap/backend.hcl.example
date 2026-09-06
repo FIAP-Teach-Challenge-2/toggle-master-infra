@@ -1,0 +1,2 @@
+# Usado apenas na migração do estado do bootstrap (veja backend.tf.migrate).
+bucket = "toggle-master-tfstate-<ACCOUNT_ID>"

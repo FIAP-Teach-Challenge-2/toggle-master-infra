@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS api_keys (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  key_hash VARCHAR(64) NOT NULL UNIQUE,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Semeia a chave de serviço do evaluation-service (apenas o hash SHA-256).
+-- Idempotente e seguro para rotação: desativa hashes antigos com o mesmo nome
+-- e (re)ativa o hash atual.
+UPDATE api_keys
+   SET is_active = false
+ WHERE name = 'evaluation-service-key'
+   AND key_hash <> '${key_hash}';
+
+INSERT INTO api_keys (name, key_hash, is_active)
+VALUES (
+  'evaluation-service-key',
+  '${key_hash}',
+  true
+)
+ON CONFLICT (key_hash) DO UPDATE SET is_active = true;

@@ -1,4 +1,4 @@
-﻿apiVersion: apps/v1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: evaluation-service
@@ -6,7 +6,7 @@ metadata:
   labels:
     app: evaluation-service
 spec:
-  replicas: 2
+  # sem replicas: a escala é controlada pelo HPA (hpa.yaml, min 2 / max 8)
   selector:
     matchLabels:
       app: evaluation-service
@@ -15,10 +15,18 @@ spec:
       labels:
         app: evaluation-service
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: evaluation-service
-          image: 010533939486.dkr.ecr.us-east-1.amazonaws.com/evaluation-service:latest
+          image: evaluation-service:latest
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 8004
           env:
