@@ -1,6 +1,9 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+# Agrega tudo para depuração sem o Argo CD (kubectl apply -k aws).
+# Registry/tag das imagens ficam no kustomization.yaml de cada serviço em
+# aws/apps/<serviço>/ (uma Application do Argo CD cada); é lá que o CI grava a tag.
 namespace: toggle-master
 
 resources:
