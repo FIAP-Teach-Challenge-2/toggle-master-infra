@@ -77,3 +77,27 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "install_argocd" {
+  description = "Instala o Argo CD via Helm e cria o Application raiz (App of Apps)."
+  type        = bool
+  default     = true
+}
+
+variable "argocd_chart_version" {
+  description = "Versão do chart argo-cd (argoproj/argo-helm). 10.8.0 = Argo CD v3.5.2."
+  type        = string
+  default     = "10.8.0"
+}
+
+variable "gitops_repo_url" {
+  description = "Repositório Git que o Argo CD monitora."
+  type        = string
+  default     = "https://github.com/FIAP-Teach-Challenge-2/toggle-master-infra.git"
+}
+
+variable "gitops_target_revision" {
+  description = "Branch observada pelo Argo CD."
+  type        = string
+  default     = "main"
+}

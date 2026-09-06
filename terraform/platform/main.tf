@@ -160,3 +160,65 @@ data "kubernetes_service_v1" "ingress_nginx" {
 
   depends_on = [helm_release.ingress_nginx]
 }
+
+locals {
+  argocd_root_app = {
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "Application"
+    metadata = {
+      name       = "toggle-master-root"
+      namespace  = "argocd"
+      finalizers = ["resources-finalizer.argocd.argoproj.io"]
+    }
+    spec = {
+      project = "default"
+      source = {
+        repoURL        = var.gitops_repo_url
+        targetRevision = var.gitops_target_revision
+        path           = "aws/argocd/applications"
+      }
+      destination = {
+        server    = "https://kubernetes.default.svc"
+        namespace = "argocd"
+      }
+      syncPolicy = {
+        automated = {
+          prune    = true
+          selfHeal = true
+        }
+      }
+    }
+  }
+}
+
+resource "helm_release" "argocd" {
+  count = var.install_argocd ? 1 : 0
+
+  name             = "argocd"
+  repository       = "https://argoproj.github.io/argo-helm"
+  chart            = "argo-cd"
+  version          = var.argocd_chart_version
+  namespace        = "argocd"
+  create_namespace = true
+
+  wait    = true
+  timeout = 900
+
+  values = [
+    yamlencode({
+      crds = { install = true, keep = false }
+
+      configs = {
+        cm     = { "timeout.reconciliation" = "30s" }
+        params = { "server.insecure" = true }
+      }
+
+      server         = { service = { type = "ClusterIP" } }
+      dex            = { enabled = false }
+      notifications  = { enabled = false }
+      applicationSet = { replicas = 0 }
+
+      extraObjects = [local.argocd_root_app]
+    })
+  ]
+}

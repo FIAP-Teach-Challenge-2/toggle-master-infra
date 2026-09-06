@@ -1,0 +1,106 @@
+name: GitOps · atualiza tag da imagem
+
+on:
+  workflow_call:
+    inputs:
+      service:
+        description: 'auth-service | flag-service | targeting-service | evaluation-service | analytics-service'
+        required: true
+        type: string
+      image:
+        description: 'Imagem sem a tag. Ex: 010533939486.dkr.ecr.us-east-1.amazonaws.com/auth-service'
+        required: true
+        type: string
+      tag:
+        description: 'Tag imutável gerada pelo CI. Ex: v1.0.0-a1b2c3d'
+        required: true
+        type: string
+      gitops_repo:
+        description: 'Repositório de manifestos a atualizar.'
+        required: false
+        type: string
+        default: FIAP-Teach-Challenge-2/toggle-master-infra
+      gitops_ref:
+        description: 'Branch a atualizar.'
+        required: false
+        type: string
+        default: main
+    secrets:
+      GITOPS_TOKEN:
+        description: 'PAT com Contents:write no repositório de manifestos.'
+        required: true
+
+concurrency:
+  group: gitops-bump-${{ inputs.service }}
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: bump ${{ inputs.service }} → ${{ inputs.tag }}
+    runs-on: ubuntu-latest
+
+    env:
+      SERVICE: ${{ inputs.service }}
+      IMAGE: ${{ inputs.image }}
+      TAG: ${{ inputs.tag }}
+      GITOPS_REF: ${{ inputs.gitops_ref }}
+      KUSTOMIZE_VERSION: v5.8.1
+
+    steps:
+      - name: Valida as entradas
+        run: |
+          case "$SERVICE" in
+            auth-service|flag-service|targeting-service|evaluation-service|analytics-service) ;;
+            *) echo "::error::serviço desconhecido: $SERVICE"; exit 1 ;;
+          esac
+          case "$TAG" in
+            ''|latest|v0.0.0-bootstrap)
+              echo "::error::tag inválida ('$TAG'). O CI deve gerar uma tag imutável."; exit 1 ;;
+          esac
+          printf '%s' "$IMAGE" | grep -Eq '^[A-Za-z0-9._/-]+$' \
+            || { echo "::error::imagem inválida: $IMAGE"; exit 1; }
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.gitops_repo }}
+          ref: ${{ inputs.gitops_ref }}
+          token: ${{ secrets.GITOPS_TOKEN }}
+          fetch-depth: 0
+
+      - name: Instala o kustomize
+        run: |
+          curl -fsSL -o kustomize.tar.gz \
+            "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz"
+          tar -xzf kustomize.tar.gz
+          sudo install -m 0755 kustomize /usr/local/bin/kustomize
+          rm -f kustomize kustomize.tar.gz
+
+      - name: Atualiza a tag
+        working-directory: aws/apps/${{ inputs.service }}
+        run: kustomize edit set image "${SERVICE}=${IMAGE}:${TAG}"
+
+      - name: Valida o build do kustomize
+        run: kustomize build "aws/apps/${SERVICE}" > /dev/null
+
+      - name: Commit e push
+        run: |
+          git config user.name  "toggle-master-ci[bot]"
+          git config user.email "toggle-master-ci@users.noreply.github.com"
+
+          if git diff --quiet; then
+            echo "::notice::nada mudou — $SERVICE já está em $TAG"
+            exit 0
+          fi
+
+          git commit -am "chore(gitops): ${SERVICE} -> ${TAG}" \
+                     -m "Imagem: ${IMAGE}:${TAG}" \
+                     -m "Origem: ${{ github.repository }}@${{ github.sha }}"
+
+          for attempt in 1 2 3 4 5; do
+            if git push origin "HEAD:${GITOPS_REF}"; then exit 0; fi
+            echo "push rejeitado (tentativa $attempt) — rebaseando"
+            git pull --rebase origin "${GITOPS_REF}"
+            sleep $((attempt * 3))
+          done
+          echo "::error::não foi possível fazer push no repositório de GitOps"
+          exit 1
