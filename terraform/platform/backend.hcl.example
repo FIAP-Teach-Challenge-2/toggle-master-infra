@@ -1,0 +1,4 @@
+# Copie para backend.hcl e troque <ACCOUNT_ID> pelo ID da conta
+# (aws sts get-caller-identity --query Account --output text).
+# region, encrypt e use_lockfile já estão no backend.tf versionado.
+bucket = "toggle-master-tfstate-<ACCOUNT_ID>"

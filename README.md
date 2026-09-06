@@ -1,98 +1,89 @@
-# ToggleMaster — Manifestos Kubernetes (AWS EKS)
+# ToggleMaster — Infraestrutura (Terraform + Kubernetes/EKS)
 
-Manifestos para implantar o ecossistema de microsserviços **ToggleMaster** em um cluster **Kubernetes na AWS (EKS)**. O ambiente-alvo é o **AWS Academy**, então o deploy usa a **`LabRole`** e o autoscaling é feito por **HPA (CPU)** — o KEDA fica como exemplo opcional (depende de IRSA, indisponível no Academy).
+Infraestrutura como código do ecossistema de microsserviços **ToggleMaster** na AWS (**EKS**), com alvo no **AWS Academy** (`LabRole`, sem criação de IAM).
+
+- **`terraform/`** — provisiona toda a infraestrutura AWS (VPC, EKS, 3× RDS, Redis, DynamoDB, SQS, ECR) e cria o Namespace/Secret/ConfigMaps e os add-ons no cluster. Leia o [`terraform/README.md`](terraform/README.md).
+- **`aws/`** — manifests Kubernetes (Kustomize) dos 5 microsserviços: Deployments, Services, Jobs de init dos bancos, Ingress nginx e HPA.
 
 ## Estrutura
 
 ```
-k8s/
+toggle-master-infra/
+├── terraform/
+│   ├── bootstrap/            # bucket S3 do estado remoto (use_lockfile)
+│   ├── infra/                # VPC, EKS (LabRole), RDS x3, ElastiCache, DynamoDB, SQS, ECR
+│   ├── platform/             # namespace, Secret, ConfigMaps, metrics-server, ingress-nginx
+│   └── modules/              # networking, eks, rds, elasticache, dynamodb, sqs, ecr
 └── aws/
-    ├── namespace.yaml            # namespace "toggle-master"
-    ├── configmap.yaml            # URLs internas, região, nome da tabela DynamoDB
-    ├── secrets.template.yaml     # MODELO do Secret (valores placeholder — não aplicar)
-    ├── db-init-jobs.yaml         # Jobs psql: criam tabelas e semeiam a API key nos RDS
-    ├── apps/
-    │   ├── auth-service.yaml         # Deployment + Service (porta 8001)
-    │   ├── flag-service.yaml         # Deployment + Service (porta 8002)
-    │   ├── targeting-service.yaml    # Deployment + Service (porta 8003)
-    │   ├── evaluation-service.yaml   # Deployment + Service (porta 8004)
-    │   └── analytics-service.yaml    # Deployment + Service (porta 8005)
-    ├── ingress.yaml              # Nginx Ingress (roteamento por path)
-    ├── hpa.yaml                  # HorizontalPodAutoscaler (evaluation + analytics)
-    ├── keda/
-    │   └── analytics-scaledobject.example.yaml   # exemplo KEDA (opcional, conta pessoal)
-    └── kustomization.yaml        # agrega todos os recursos
+    ├── db-init-jobs.yaml     # ConfigMaps SQL (flag/targeting) + 3 Jobs psql
+    ├── apps/                 # Deployment + Service de cada serviço (portas 8001–8005)
+    ├── ingress.yaml          # Nginx Ingress (roteamento por path)
+    ├── hpa.yaml              # HPA por CPU (evaluation + analytics)
+    ├── keda/                 # exemplo KEDA (opcional; exige IRSA, fora do Academy)
+    └── kustomization.yaml    # recursos + bloco images: (registry/tag em um só lugar)
 ```
 
 ## Arquitetura implantada
 
-Cinco microsserviços, cada um como `Deployment` + `Service` (ClusterIP), expostos externamente por um único **Nginx Ingress** (Load Balancer na AWS):
+Cinco microsserviços, cada um como `Deployment` + `Service` (ClusterIP), expostos por um único **Nginx Ingress** (Network Load Balancer):
 
 | Serviço | Porta | Persistência |
 |---|---|---|
-| auth-service (Go) | 8001 | RDS PostgreSQL |
-| flag-service (Python) | 8002 | RDS PostgreSQL |
-| targeting-service (Python) | 8003 | RDS PostgreSQL |
+| auth-service (Go) | 8001 | RDS PostgreSQL `auth_db` |
+| flag-service (Python) | 8002 | RDS PostgreSQL `flags_db` |
+| targeting-service (Python) | 8003 | RDS PostgreSQL `targeting_db` |
 | evaluation-service (Go) | 8004 | ElastiCache (Redis) + SQS |
-| analytics-service (Python) | 8005 | SQS + DynamoDB |
+| analytics-service (Python) | 8005 | SQS + DynamoDB `ToggleMasterAnalytics` |
 
-Todos os Deployments usam `requests`/`limits` de CPU e memória e `readiness`/`liveness probes` no endpoint `/health`.
+Todos os Deployments têm `requests`/`limits`, probes de `readiness`/`liveness` em `/health`, `securityContext` restritivo (seccomp `RuntimeDefault`, sem escalada de privilégio, sem capabilities) e não montam token de service account. Os Jobs de init rodam `psql` como usuário `postgres` (não-root) com `ON_ERROR_STOP`, então um erro no SQL deixa o Job `Failed` em vez de `Complete`.
 
-## Pré-requisitos
+## Quem cria o quê
 
-Antes de aplicar os manifestos, é preciso ter provisionado:
-
-- Cluster **EKS** ativo + managed node group com a **LabRole** (permite pull no ECR e acesso a SQS/DynamoDB).
-- **Metrics Server** instalado (necessário para o HPA).
-- **Nginx Ingress Controller** instalado (provisiona o Load Balancer).
-- **5 imagens** publicadas no ECR (`010533939486.dkr.ecr.us-east-1.amazonaws.com/<serviço>:latest`).
-- **3 RDS PostgreSQL** (`auth_db`, `flags_db`, `targeting_db`), **ElastiCache Redis**, tabela **DynamoDB `ToggleMasterAnalytics`** (PK `event_id`) e uma fila **SQS**.
-- **Security groups** liberando 5432 (RDS) e 6379 (Redis) para o SG dos nós.
+| Objeto | Dono | Motivo |
+|---|---|---|
+| Recursos AWS (VPC, EKS, RDS, Redis, DynamoDB, SQS, ECR) | `terraform/infra` | Requisito de IaC da Fase 3 |
+| Namespace `toggle-master` (PSA `baseline`) | `terraform/platform` | Precisa existir antes do Secret |
+| Secret `toggle-master-secrets` | `terraform/platform` | Valores vêm dos outputs reais do `infra` (remote state); `MASTER_KEY`/`SERVICE_API_KEY` geradas aleatoriamente |
+| ConfigMap `toggle-master-config` | `terraform/platform` | Região e nome da tabela vêm do Terraform |
+| ConfigMap `auth-db-init-sql` | `terraform/platform` | Contém o hash SHA-256 da `SERVICE_API_KEY` gerada |
+| metrics-server, ingress-nginx | `terraform/platform` (Helm) | Eram instalados à mão |
+| Deployments, Services, Jobs, Ingress, HPA | `aws/` (Kustomize) | Workloads — na etapa GitOps passam a ser sincronizados pelo ArgoCD |
 
 ## Deploy
 
-### 1. Criar o Secret real
+Todos os comandos abaixo partem da raiz deste diretório (`toggle-master-infra/`).
 
-O `secrets.template.yaml` contém apenas valores placeholder e **não deve ser aplicado**. Crie o Secret com os endpoints reais:
+### 1. Infraestrutura (Terraform)
 
-```bash
-kubectl create namespace toggle-master
+Siga o [`terraform/README.md`](terraform/README.md): `bootstrap` → `infra` → `platform`. Ao final você terá o cluster, os bancos, a fila, os repositórios ECR e o namespace já com Secret e ConfigMaps.
 
-kubectl -n toggle-master create secret generic toggle-master-secrets \
-  --from-literal=AUTH_DATABASE_URL="postgres://toggle:SENHA@ENDPOINT_AUTH:5432/auth_db?sslmode=require" \
-  --from-literal=FLAG_DATABASE_URL="postgres://toggle:SENHA@ENDPOINT_FLAG:5432/flags_db?sslmode=require" \
-  --from-literal=TARGETING_DATABASE_URL="postgres://toggle:SENHA@ENDPOINT_TARG:5432/targeting_db?sslmode=require" \
-  --from-literal=REDIS_URL="redis://ENDPOINT_REDIS:6379" \
-  --from-literal=AWS_SQS_URL="https://sqs.us-east-1.amazonaws.com/010533939486/toggle-master-evaluations" \
-  --from-literal=MASTER_KEY="admin-secreto-123" \
-  --from-literal=SERVICE_API_KEY="tm_key_local_dev"
-```
+### 2. Imagens
 
-> `SERVICE_API_KEY` deve ser `tm_key_local_dev` — o `db-init-jobs.yaml` semeia o hash SHA-256 exato dessa chave no banco do auth. Use `rediss://` no `REDIS_URL` se o Redis for Serverless (TLS obrigatório).
-
-### 2. Aplicar os manifestos
-
-Certifique-se de que o `kustomization.yaml` **não** inclui `secrets.template.yaml` (você criou o Secret real acima). Então:
+Publique as 5 imagens nos repositórios ECR criados:
 
 ```bash
-kubectl apply -k k8s/aws
+terraform -chdir=terraform/infra output ecr_repository_urls
 ```
 
-Isso cria o namespace, o ConfigMap, os Jobs de init, os 5 Deployments + Services, o Ingress e os HPAs.
+Os repositórios ECR seguem o padrão `togglemaster/<serviço>` (ex.: `togglemaster/auth-service`), o mesmo usado no código e no CI. Os Deployments referenciam só o nome do serviço (`auth-service:latest`); registry, namespace e tag ficam no bloco `images:` de `aws/kustomization.yaml`. Se o ID da conta for diferente de `010533939486`, troque-o lá (ou use `kustomize edit set image auth-service=<registry>/togglemaster/auth-service:<tag>` — o mesmo comando que o CI usará para gravar a tag do commit).
 
-### 3. Verificar
+### 3. Workloads
+
+```bash
+aws eks update-kubeconfig --region us-east-1 --name toggle-master-dev-eks
+kubectl apply -k aws
+```
+
+### 4. Verificar
 
 ```bash
 kubectl -n toggle-master get jobs      # auth/flag/targeting-db-init = Complete
 kubectl -n toggle-master get pods      # 5 serviços Running/Ready
-kubectl -n toggle-master get svc
-kubectl -n toggle-master get ingress
-kubectl -n toggle-master get hpa
+kubectl -n toggle-master get ingress,hpa
+kubectl -n ingress-nginx get svc ingress-nginx-controller   # DNS do NLB
 ```
 
 ## Acesso externo (Ingress)
-
-O `ingress.yaml` roteia por path a partir do DNS do Load Balancer:
 
 | Path | Serviço |
 |---|---|
@@ -102,25 +93,29 @@ O `ingress.yaml` roteia por path a partir do DNS do Load Balancer:
 | `/evaluate` | evaluation-service |
 | `/analytics/*` | analytics-service |
 
-Exemplo:
+O NLB expõe 80 e 443; o 443 usa o certificado autoassinado do controller (o lab não tem domínio), por isso `-k`. Envie a `MASTER_KEY` só por HTTPS. No Windows PowerShell use `curl.exe` (o `curl` é alias de `Invoke-WebRequest`) ou rode o bloco no Git Bash.
 
 ```bash
-LB=<DNS-DO-LOAD-BALANCER>
-curl "http://$LB/auth/health"
-curl "http://$LB/evaluate?user_id=user-123&flag_name=nova-home"
+LB=$(kubectl -n ingress-nginx get svc ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+MASTER_KEY=$(terraform -chdir=terraform/platform output -raw master_key)
+
+curl -k "https://$LB/auth/health"
+curl -k -X POST "https://$LB/admin/keys" -H "Authorization: Bearer $MASTER_KEY" \
+     -H "Content-Type: application/json" -d '{"name":"demo"}'
+curl -k "https://$LB/evaluate?user_id=user-123&flag_name=nova-home"
 ```
 
 ## Escalabilidade
 
-O `hpa.yaml` define HPA por **CPU** (alvo 70%) para:
-
-- `evaluation-service` — min 2, max 8 réplicas.
-- `analytics-service` — min 1, max 6 réplicas (quando a fila enche, a CPU sobe ao processar e o HPA escala).
-
-O arquivo `keda/analytics-scaledobject.example.yaml` mostra a alternativa com **KEDA** escalando o analytics diretamente pelo tamanho da fila SQS (`queueLength`) — recomendado em conta pessoal (fora do Academy), pois exige IRSA.
+`hpa.yaml` define HPA por CPU (alvo 70%) para `evaluation-service` (2–8 réplicas) e `analytics-service` (1–6). Esses dois Deployments não declaram `replicas`, para que um `kubectl apply`/sync do ArgoCD não desfaça a escala escolhida pelo HPA. O `keda/analytics-scaledobject.example.yaml` mostra a alternativa com KEDA escalando pelo tamanho da fila SQS — exige IRSA, indisponível no Academy.
 
 ## Observações do ambiente AWS Academy
 
-- **LabRole:** cluster, nós e permissões de AWS (ECR, SQS, DynamoDB) usam a `LabRole` existente; não é possível criar novas IAM roles.
-- **Credenciais nos pods:** os pods obtêm as permissões de AWS pela role do nó (LabRole) via IMDS.
-- **Secrets:** os valores reais **não** são versionados. Apenas o `secrets.template.yaml` (com placeholders) fica no repositório.
+- **LabRole**: cluster, nós e permissões de AWS (ECR, SQS, DynamoDB) usam a `LabRole` existente, importada no Terraform via `data "aws_iam_role"`.
+- **Credenciais nos pods**: obtidas pela role do nó via IMDSv2; o launch template do node group define hop limit 2 (obrigatório em AL2023 para os containers alcançarem o IMDS).
+- **Segredos**: nenhum valor real é versionado. Senhas do RDS e chaves da aplicação são geradas pelo Terraform e vivem no estado remoto (S3 criptografado) e no Secret do cluster. Os três estados (bootstrap, infra, platform) ficam no S3.
+- **Custo**: ~US$ 8/dia com tudo ligado. Destrua (`platform` → `infra`) depois da demo.
+
+## Próximas etapas do Tech Challenge (fora deste diretório)
+
+Pipelines de CI DevSecOps (GitHub Actions por serviço), repositório GitOps com atualização automática da tag da imagem (bloco `images:` do `kustomization.yaml`) e ArgoCD sincronizando os 5 serviços.

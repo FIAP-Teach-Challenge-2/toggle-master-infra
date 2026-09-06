@@ -1,0 +1,26 @@
+# Terraform — nunca versionar estado, planos, credenciais ou configs locais
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+crash.log
+crash.*.log
+tfplan
+*.tfplan
+
+# Valores de variáveis podem conter segredos; só os exemplos são versionados
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+
+# Configuração parcial do backend (específica da conta); só o exemplo é versionado
+backend.hcl
+!backend.hcl.example
+
+# Overrides locais
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc

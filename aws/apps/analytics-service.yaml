@@ -1,4 +1,4 @@
-﻿apiVersion: apps/v1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: analytics-service
@@ -6,7 +6,7 @@ metadata:
   labels:
     app: analytics-service
 spec:
-  replicas: 1
+  # sem replicas: a escala é controlada pelo HPA (hpa.yaml, min 1 / max 6)
   selector:
     matchLabels:
       app: analytics-service
@@ -15,10 +15,18 @@ spec:
       labels:
         app: analytics-service
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: analytics-service
-          image: 010533939486.dkr.ecr.us-east-1.amazonaws.com/analytics-service:latest
+          image: analytics-service:latest
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 8005
           env:
