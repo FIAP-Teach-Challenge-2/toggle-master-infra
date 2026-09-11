@@ -8,5 +8,5 @@ resources:
 
 images:
 - name: analytics-service
-  newName: 415764219943.dkr.ecr.us-east-1.amazonaws.com/togglemaster/analytics-service
-  newTag: v0.0.0-bootstrap
+  newName: 965145516306.dkr.ecr.us-east-1.amazonaws.com/togglemaster/analytics-service
+  newTag: 4211c44ff854f96dcb62434b65fa795678e56c7d
