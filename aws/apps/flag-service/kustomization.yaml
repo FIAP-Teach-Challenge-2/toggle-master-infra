@@ -8,5 +8,5 @@ resources:
 
 images:
 - name: flag-service
-  newName: 415764219943.dkr.ecr.us-east-1.amazonaws.com/togglemaster/flag-service
-  newTag: v0.0.0-bootstrap
+  newName: 965145516306.dkr.ecr.us-east-1.amazonaws.com/togglemaster/flag-service
+  newTag: 69055f07ba908e0479740dbae9113e44e2cc8969
