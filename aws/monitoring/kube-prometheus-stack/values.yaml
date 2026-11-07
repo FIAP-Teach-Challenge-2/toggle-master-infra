@@ -1,0 +1,141 @@
+# Valores enxutos para AWS Academy (2× t3.medium, disco limitado).
+# Release name esperado: kube-prometheus-stack (label release nos ServiceMonitors).
+
+alertmanager:
+  enabled: false
+
+grafana:
+  adminPassword: togglemaster
+  persistence:
+    enabled: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: ALL
+      folderAnnotation: grafana_folder
+      provider:
+        foldersFromFilesStructure: false
+    datasources:
+      enabled: true
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      access: proxy
+      url: http://loki.monitoring.svc:3100
+      isDefault: false
+      jsonData:
+        maxLines: 1000
+  grafana.ini:
+    auth.anonymous:
+      enabled: false
+    users:
+      default_theme: dark
+
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+prometheus:
+  prometheusSpec:
+    retention: 24h
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+    replicas: 1
+    shards: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 5Gi
+    # Aceita ServiceMonitors de qualquer namespace (ingress-nginx incluso).
+    serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelector: {}
+    serviceMonitorNamespaceSelector: {}
+    podMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelector: {}
+    podMonitorNamespaceSelector: {}
+    # Fallback: scrape do Service de metrics do ingress via annotation.
+    additionalScrapeConfigs:
+      - job_name: ingress-nginx
+        kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names:
+                - ingress-nginx
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_label_app_kubernetes_io_name]
+            action: keep
+            regex: ingress-nginx
+          - source_labels: [__meta_kubernetes_service_label_app_kubernetes_io_component]
+            action: keep
+            regex: metrics
+          - source_labels: [__meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: metrics
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_service_name]
+            target_label: service
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+prometheus-node-exporter:
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+# Control plane EKS gerenciado — scrapes internos não aplicam.
+kubeEtcd:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
+
+defaultRules:
+  create: true
+  rules:
+    alertmanager: false
+    etcd: false
+    kubeSchedulerAlerting: false
+    kubeSchedulerRecording: false
+    kubeControllerManager: false

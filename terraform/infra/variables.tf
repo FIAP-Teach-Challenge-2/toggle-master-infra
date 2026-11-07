@@ -130,9 +130,9 @@ variable "eks_node_capacity_type" {
 }
 
 variable "eks_node_disk_size" {
-  description = "Disco raiz dos nós em GiB (mínimo 20, tamanho do snapshot da AMI AL2023)."
+  description = "Disco raiz dos nós em GiB (mínimo 20, tamanho do snapshot da AMI AL2023). 40 GiB deixa folga para PVCs do Prometheus/Loki."
   type        = number
-  default     = 20
+  default     = 40
 
   validation {
     condition     = var.eks_node_disk_size >= 20

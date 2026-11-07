@@ -117,9 +117,9 @@ variable "node_capacity_type" {
 }
 
 variable "node_disk_size" {
-  description = "Tamanho do disco raiz (gp3, criptografado) dos nós, em GiB. Definido no launch template. Mínimo 20 (tamanho do snapshot da AMI EKS AL2023)."
+  description = "Tamanho do disco raiz (gp3, criptografado) dos nós, em GiB. Definido no launch template. Mínimo 20 (tamanho do snapshot da AMI EKS AL2023). 40 GiB deixa folga para PVCs do Prometheus/Loki."
   type        = number
-  default     = 20
+  default     = 40
 
   validation {
     condition     = var.node_disk_size >= 20

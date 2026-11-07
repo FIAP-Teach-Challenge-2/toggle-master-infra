@@ -13,6 +13,7 @@ do cluster.
 | CI atualiza a tag da imagem | `.github/workflows/gitops-bump.yml` |
 | Argo CD monitora e sincroniza sozinho | `automated`, `prune`, `selfHeal` |
 | Argo CD gerenciando os 5 microsserviços | 5 Applications independentes |
+| Stack de monitoramento (Fase 4) | Applications Helm + `aws/monitoring/` — ver [`MONITORING.md`](MONITORING.md) |
 
 ## 2. Como o fluxo funciona
 

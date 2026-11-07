@@ -3,7 +3,7 @@
 Infraestrutura como código do ecossistema de microsserviços **ToggleMaster** na AWS (**EKS**), com alvo no **AWS Academy** (`LabRole`, sem criação de IAM).
 
 - **`terraform/`** — provisiona toda a infraestrutura AWS (VPC, EKS, 3× RDS, Redis, DynamoDB, SQS, ECR) e cria o Namespace/Secret/ConfigMaps e os add-ons no cluster. Leia o [`terraform/README.md`](terraform/README.md).
-- **`aws/`** — manifests Kubernetes (Kustomize) dos 5 microsserviços e as Applications do Argo CD. Leia o [`docs/CD-GITOPS.md`](docs/CD-GITOPS.md).
+- **`aws/`** — manifests Kubernetes (Kustomize) dos 5 microsserviços, Applications do Argo CD e stack de monitoramento. Leia o [`docs/CD-GITOPS.md`](docs/CD-GITOPS.md) e o [`docs/MONITORING.md`](docs/MONITORING.md).
 
 ## Estrutura
 
@@ -16,12 +16,16 @@ toggle-master-infra/
 │   └── modules/              # networking, eks, rds, elasticache, dynamodb, sqs, ecr
 ├── .github/workflows/
 │   └── gitops-bump.yml       # o CI chama daqui para gravar a tag da imagem
+├── docs/
+│   ├── CD-GITOPS.md
+│   └── MONITORING.md         # Prometheus + Loki + Grafana (Fase 4 Parte 1)
 └── aws/
     ├── platform/             # Jobs de init, Ingress e HPA — uma Application
     ├── apps/<serviço>/       # Deployment + Service + kustomization — uma Application cada
-    ├── argocd/applications/  # as 6 Applications do Argo CD
+    ├── monitoring/           # values Helm + dashboard Grafana (GitOps)
+    ├── argocd/applications/  # Applications do Argo CD (apps + monitoring)
     ├── keda/                 # exemplo KEDA (opcional; exige IRSA, fora do Academy)
-    └── kustomization.yaml    # agrega tudo (fallback sem Argo CD)
+    └── kustomization.yaml    # agrega apps (fallback sem Argo CD; sem monitoring Helm)
 ```
 
 ## Arquitetura implantada
@@ -47,8 +51,9 @@ Todos os Deployments têm `requests`/`limits`, probes de `readiness`/`liveness` 
 | Secret `toggle-master-secrets` | `terraform/platform` | Valores vêm dos outputs reais do `infra` (remote state); `MASTER_KEY`/`SERVICE_API_KEY` geradas aleatoriamente |
 | ConfigMap `toggle-master-config` | `terraform/platform` | Região e nome da tabela vêm do Terraform |
 | ConfigMap `auth-db-init-sql` | `terraform/platform` | Contém o hash SHA-256 da `SERVICE_API_KEY` gerada |
-| metrics-server, ingress-nginx | `terraform/platform` (Helm) | Eram instalados à mão |
-| Deployments, Services, Jobs, Ingress, HPA | `aws/` (Kustomize) | Workloads — na etapa GitOps passam a ser sincronizados pelo ArgoCD |
+| metrics-server, ingress-nginx | `terraform/platform` (Helm) | Eram instalados à mão; metrics do ingress alimentam o Grafana |
+| Deployments, Services, Jobs, Ingress, HPA | `aws/` (Kustomize) | Workloads — sincronizados pelo Argo CD |
+| Prometheus, Loki, Grafana, Promtail | `aws/monitoring/` + Applications Argo | Fase 4 Parte 1 — ver [`docs/MONITORING.md`](docs/MONITORING.md) |
 
 ## Deploy
 
@@ -126,7 +131,19 @@ serviço é uma Application apontando para `aws/apps/<serviço>/`, com `automate
 imagem no `kustomization.yaml` correspondente — nenhum pipeline tem credencial de
 cluster. Detalhes em [`docs/CD-GITOPS.md`](docs/CD-GITOPS.md).
 
-## Próximas etapas do Tech Challenge (fora deste diretório)
+## Monitoramento Opensource (Fase 4 — Parte 1)
 
-Pipelines de CI DevSecOps (GitHub Actions por serviço), que passam a chamar o
-workflow de GitOps deste repositório.
+Prometheus, Loki e Grafana entram via Applications Helm no App-of-Apps
+(`aws/argocd/applications/`), com values em `aws/monitoring/`. Dashboard
+customizado **ToggleMaster Overview** (CPU/memória, taxa de requests do ingress,
+logs do Loki). Guia completo: [`docs/MONITORING.md`](docs/MONITORING.md).
+
+```bash
+kubectl -n argocd get applications
+kubectl -n monitoring port-forward svc/kube-prometheus-stack-grafana 3000:80
+# admin / togglemaster
+```
+
+## Próximas etapas do Tech Challenge
+
+Parte 2+: OpenTelemetry Collector, APM (Datadog/New Relic), alertas e self-healing.

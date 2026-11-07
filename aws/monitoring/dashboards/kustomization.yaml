@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: monitoring
+
+resources:
+  - ingress-nginx-servicemonitor.yaml
+
+configMapGenerator:
+  - name: togglemaster-overview-dashboard
+    files:
+      - togglemaster-overview.json
+    options:
+      labels:
+        grafana_dashboard: "1"
+        app.kubernetes.io/part-of: toggle-master
+      annotations:
+        grafana_folder: ToggleMaster
+
+generatorOptions:
+  disableNameSuffixHash: true

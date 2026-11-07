@@ -145,6 +145,18 @@ resource "helm_release" "ingress_nginx" {
             "service.beta.kubernetes.io/aws-load-balancer-type" = "nlb"
           }
         }
+        # Métricas para o Prometheus (taxa de requisições no dashboard ToggleMaster).
+        # ServiceMonitor fica no GitOps (CRD só existe após o kube-prometheus-stack);
+        # as annotations bastam para o scrape via additionalScrapeConfigs / SM externo.
+        metrics = {
+          enabled = true
+          service = {
+            annotations = {
+              "prometheus.io/scrape" = "true"
+              "prometheus.io/port"   = "10254"
+            }
+          }
+        }
       }
     })
   ]
@@ -217,8 +229,15 @@ resource "helm_release" "argocd" {
       dex            = { enabled = false }
       notifications  = { enabled = false }
       applicationSet = { replicas = 0 }
-
-      extraObjects = [local.argocd_root_app]
     })
   ]
+}
+
+# extraObjects no mesmo release falha: o Helm valida Application antes dos CRDs existirem.
+resource "kubernetes_manifest" "argocd_root_app" {
+  count = var.install_argocd ? 1 : 0
+
+  manifest = local.argocd_root_app
+
+  depends_on = [helm_release.argocd]
 }

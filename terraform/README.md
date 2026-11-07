@@ -229,6 +229,7 @@ O bucket do `bootstrap` é mantido de propósito (`prevent_destroy`); apague-o m
 | `eks_enabled_cluster_log_types` | `api, audit, authenticator` | Logs do control plane no CloudWatch (retenção 7 dias) |
 | `ecr_image_tag_mutability` | `MUTABLE` | Mude para `IMMUTABLE` quando o CI publicar só tags de commit |
 | `eks_node_instance_types` / `eks_node_desired_size` | `["t3.medium"]` / `2` | |
+| `eks_node_disk_size` | `40` | GiB gp3 no launch template; 40 deixa folga para PVCs do Prometheus/Loki |
 | `enable_nat_gateway` | `true` | Desligue só com `eks_nodes_in_public_subnets = true` |
 | `eks_nodes_in_public_subnets` | `false` | Modo econômico |
 | `rds_instance_class` | `db.t3.micro` | Menor classe suportada pelo PG 16 (~US$ 13/mês cada; o Academy não tem free tier) |
