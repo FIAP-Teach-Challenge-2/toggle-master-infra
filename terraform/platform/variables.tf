@@ -101,3 +101,23 @@ variable "gitops_target_revision" {
   type        = string
   default     = "main"
 }
+
+variable "monitoring_namespace" {
+  description = "Namespace da stack de monitoramento (Prometheus, Alertmanager, Grafana, self-healing)."
+  type        = string
+  default     = "monitoring"
+}
+
+variable "pagerduty_routing_key" {
+  description = "Integration key (Events API v2) do serviço no PagerDuty usada pelo Alertmanager. Vazio = incidentes não são abertos."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "discord_webhook_url" {
+  description = "URL do webhook do canal do Discord (ChatOps) usada pelo Alertmanager e pelo self-healing. Vazio = sem notificação no Discord."
+  type        = string
+  default     = ""
+  sensitive   = true
+}

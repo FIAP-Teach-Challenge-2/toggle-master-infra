@@ -1,0 +1,56 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: toggle-master-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+    app.kubernetes.io/part-of: toggle-master
+spec:
+  groups:
+    - name: toggle-master.http
+      interval: 30s
+      rules:
+        - record: togglemaster:http_requests:rate2m
+          expr: |
+            sum by (exported_namespace, exported_service) (
+              rate(nginx_ingress_controller_requests{exported_namespace="toggle-master"}[2m])
+            )
+        - record: togglemaster:http_5xx:rate2m
+          expr: |
+            sum by (exported_namespace, exported_service) (
+              rate(nginx_ingress_controller_requests{exported_namespace="toggle-master", status=~"5.."}[2m])
+            )
+        - record: togglemaster:http_5xx:ratio2m
+          expr: |
+            togglemaster:http_5xx:rate2m
+              /
+            togglemaster:http_requests:rate2m
+        - alert: ToggleMasterHigh5xxRate
+          expr: |
+            (togglemaster:http_5xx:ratio2m > 0.05)
+            and on (exported_namespace, exported_service)
+            (togglemaster:http_requests:rate2m > 0.1)
+          for: 1m
+          labels:
+            severity: critical
+            team: toggle-master
+            self_heal: "true"
+            deployment: "{{ $labels.exported_service }}"
+          annotations:
+            summary: "{{ $labels.exported_service }} com {{ $value | humanizePercentage }} de respostas HTTP 5xx"
+            description: "Mais de 5% das requisições ao {{ $labels.exported_service }} (via ingress) retornaram 5xx nos últimos 2 minutos, sustentado por 1 minuto. O self-healing vai executar rollout restart do deployment."
+            runbook_url: "https://github.com/FIAP-Teach-Challenge-2/toggle-master-infra/blob/main/docs/ALERTING-SELF-HEALING.md#runbook-togglemasterhigh5xxrate"
+        - alert: ToggleMaster5xxRateWarning
+          expr: |
+            (togglemaster:http_5xx:ratio2m > 0.01)
+            and on (exported_namespace, exported_service)
+            (togglemaster:http_requests:rate2m > 0.1)
+          for: 5m
+          labels:
+            severity: warning
+            team: toggle-master
+          annotations:
+            summary: "{{ $labels.exported_service }} com {{ $value | humanizePercentage }} de respostas HTTP 5xx"
+            description: "Taxa de 5xx do {{ $labels.exported_service }} acima de 1% por 5 minutos. Só notifica o Discord (sem página e sem self-healing)."
+            runbook_url: "https://github.com/FIAP-Teach-Challenge-2/toggle-master-infra/blob/main/docs/ALERTING-SELF-HEALING.md#runbook-togglemaster5xxratewarning"

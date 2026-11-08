@@ -1,7 +1,7 @@
 # Monitoramento Opensource — Fase 4 (Parte 1)
 
 Stack **Prometheus + Loki + Grafana** no EKS, provisionada via **GitOps (Argo CD + Helm)**.
-OTel Collector, APM e alertas/self-healing ficam nas partes seguintes.
+OTel Collector e APM ficam nas partes seguintes; alertas e self-healing estão em [ALERTING-SELF-HEALING.md](ALERTING-SELF-HEALING.md).
 
 ## Arquitetura
 
@@ -111,6 +111,6 @@ Depois disso o painel de request rate e o de logs devem se movimentar.
 ## Limitações do lab
 
 - Retenção Prometheus/Loki: **24 h**; PVCs **5 GiB**.
-- Alertmanager desligado (Parte 4).
+- Alertmanager ligado na Parte 4 — ver [ALERTING-SELF-HEALING.md](ALERTING-SELF-HEALING.md).
 - Sem S3/IRSA no Loki — storage local no nó.
 - Senha do Grafana em texto no values (aceitável no Academy; não use em produção).

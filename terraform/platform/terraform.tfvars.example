@@ -19,3 +19,8 @@ install_ingress_nginx  = true
 # Versões dos charts (fixadas nos defaults; ajuste se precisar)
 # metrics_server_chart_version = "3.13.1"
 # ingress_nginx_chart_version  = "4.15.1"
+
+# Alertas (Fase 4): PagerDuty Events API v2 + webhook do Discord.
+# Nunca versione os valores reais (o repositório é público).
+# pagerduty_routing_key = ""
+# discord_webhook_url   = ""
