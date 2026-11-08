@@ -42,6 +42,8 @@ spec:
                 secretKeyRef:
                   name: toggle-master-secrets
                   key: MASTER_KEY
+            - name: CHAOS_ENABLED
+              value: "true"
           readinessProbe:
             httpGet:
               path: /health

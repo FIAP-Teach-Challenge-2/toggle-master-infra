@@ -103,6 +103,34 @@ resource "kubernetes_config_map_v1" "auth_db_init_sql" {
   }
 }
 
+resource "kubernetes_namespace_v1" "monitoring" {
+  metadata {
+    name = var.monitoring_namespace
+
+    labels = {
+      "app.kubernetes.io/part-of" = "toggle-master"
+    }
+  }
+
+  lifecycle {
+    ignore_changes = [metadata[0].labels, metadata[0].annotations]
+  }
+}
+
+resource "kubernetes_secret_v1" "alertmanager_integrations" {
+  metadata {
+    name      = "alertmanager-integrations"
+    namespace = kubernetes_namespace_v1.monitoring.metadata[0].name
+  }
+
+  type = "Opaque"
+
+  data = {
+    "pagerduty-routing-key" = var.pagerduty_routing_key
+    "discord-webhook-url"   = var.discord_webhook_url
+  }
+}
+
 # ---------------------------------------------------------------------------
 # Add-ons do cluster (antes instalados manualmente)
 # ---------------------------------------------------------------------------
@@ -215,6 +243,8 @@ resource "helm_release" "argocd" {
 
   wait    = true
   timeout = 900
+
+  depends_on = [kubernetes_secret_v1.alertmanager_integrations]
 
   values = [
     yamlencode({
