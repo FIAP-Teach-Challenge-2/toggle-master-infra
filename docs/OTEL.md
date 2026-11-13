@@ -94,12 +94,11 @@ terraform -chdir=terraform/platform apply   # cria monitoring/otel-apm-credentia
 - **Python**: nada a rodar. `requirements.txt` e Dockerfile já instalam o distro e as instrumentações.
 - Faça push em cada serviço. O CI gera a imagem e o `gitops-bump` atualiza a tag.
 
-### 5. Desligar o Promtail (depois de validar os logs pelo Collector)
+### 5. Remoção do Promtail (PR separado)
 
-```bash
-git rm aws/argocd/applications/promtail.yaml aws/monitoring/promtail/values.yaml
-git commit -m "chore(monitoring): Promtail substituído pelo OTel Collector (filelog)"
-```
+O Promtail sai em um PR próprio (branch `chore/remove-promtail`), que só deve ser mergeado depois de validar os logs chegando ao Loki pelo Collector. Esse PR apaga a Application `promtail` e o `aws/monitoring/promtail/values.yaml`; o Argo CD remove o DaemonSet (prune do root app).
+
+Enquanto os dois estiverem ativos, cada linha de log entra duas vezes no Loki. Depois da remoção, queries com os labels antigos do Promtail (`namespace`, `app`) não retornam logs novos: use `k8s_namespace_name` e `k8s_container_name`.
 
 Com os dois ligados, os logs ficam duplicados no Loki: o Promtail usa os labels `namespace`/`app` e o Collector usa `k8s_namespace_name`/`service_name`.
 
