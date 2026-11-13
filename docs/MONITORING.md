@@ -1,7 +1,7 @@
 # Monitoramento Opensource — Fase 4 (Parte 1)
 
 Stack **Prometheus + Loki + Grafana** no EKS, provisionada via **GitOps (Argo CD + Helm)**.
-OTel Collector e APM ficam nas partes seguintes; alertas e self-healing estão em [ALERTING-SELF-HEALING.md](ALERTING-SELF-HEALING.md).
+Desde a Parte 2, **logs e telemetria das aplicações passam pelo OTel Collector** — ver [OTEL.md](OTEL.md); alertas e self-healing estão em [ALERTING-SELF-HEALING.md](ALERTING-SELF-HEALING.md).
 
 ## Arquitetura
 
@@ -9,7 +9,8 @@ OTel Collector e APM ficam nas partes seguintes; alertas e self-healing estão e
 flowchart LR
   ingress[ingress-nginx metrics] --> prom[Prometheus]
   nodes[node-exporter / cAdvisor] --> prom
-  pods[pods stdout] --> promtail[Promtail] --> loki[Loki]
+  pods[pods stdout] --> otel[OTel Collector] --> loki[Loki]
+  apps[apps OTel SDK] --> otel --> prom
   prom --> grafana[Grafana]
   loki --> grafana
 ```
@@ -18,10 +19,10 @@ flowchart LR
 |---|---|---|
 | Prometheus + Grafana + kube-state-metrics + node-exporter | Application `kube-prometheus-stack` | `prometheus-community/kube-prometheus-stack` `92.22.0` + [`aws/monitoring/kube-prometheus-stack/values.yaml`](../aws/monitoring/kube-prometheus-stack/values.yaml) |
 | Loki (SingleBinary, filesystem) | Application `loki` | `grafana/loki` `6.55.0` + [`aws/monitoring/loki/values.yaml`](../aws/monitoring/loki/values.yaml) |
-| Promtail | Application `promtail` | `grafana/promtail` `6.17.1` + [`aws/monitoring/promtail/values.yaml`](../aws/monitoring/promtail/values.yaml) |
+| OTel Collector (substitui o Promtail) | Application `otel-collector` | `open-telemetry/opentelemetry-collector` + [`aws/monitoring/otel-collector/values.yaml`](../aws/monitoring/otel-collector/values.yaml) — ver [OTEL.md](OTEL.md) |
 | Dashboard + ServiceMonitor ingress | Application `monitoring-dashboards` | [`aws/monitoring/dashboards/`](../aws/monitoring/dashboards/) |
 
-Namespace: **`monitoring`**. Taxa de requisições dos microsserviços vem das métricas do **ingress-nginx** (as apps ainda não expõem `/metrics` — isso entra com OTel/APM).
+Namespace: **`monitoring`**. Taxa de requisições dos microsserviços vem das métricas do **ingress-nginx** e, desde a Parte 2, também do **spanmetrics** do OTel Collector (`traces_span_metrics_calls_total`).
 
 ## Pré-requisitos de infra
 
@@ -43,10 +44,10 @@ O node group recria nós ao mudar o launch template (disco). Aguarde os nós Rea
 aws eks update-kubeconfig --region us-east-1 --name toggle-master-dev-eks
 
 kubectl -n argocd get applications
-# kube-prometheus-stack, loki, promtail, monitoring-dashboards → Synced / Healthy
+# kube-prometheus-stack, loki, otel-collector, monitoring-dashboards → Synced / Healthy
 
 kubectl -n monitoring get pods
-# prometheus, grafana, loki, promtail, node-exporter, kube-state-metrics → Running
+# prometheus, grafana, loki, otel-collector, node-exporter, kube-state-metrics → Running
 
 kubectl -n monitoring get pvc
 # 5Gi prometheus + 5Gi loki Bound
@@ -64,7 +65,7 @@ kubectl -n monitoring port-forward svc/kube-prometheus-stack-grafana 3000:80
 
 Datasources esperados: **Prometheus** (default do stack) e **Loki** (`http://loki.monitoring.svc:3100`).
 
-Dashboard: **ToggleMaster Overview** (folder ToggleMaster) — CPU/memória do cluster, request rate por serviço/path via ingress, logs `{namespace="toggle-master"}`.
+Dashboard: **ToggleMaster Overview** (folder ToggleMaster) — CPU/memória do cluster, request rate por serviço/path via ingress, request rate / erro / p95 via OTel (spanmetrics), logs `{k8s_namespace_name="toggle-master"}`.
 
 ### Queries de exemplo
 
@@ -84,8 +85,8 @@ sum(rate(nginx_ingress_controller_requests{exported_namespace="toggle-master", s
 LogQL:
 
 ```logql
-{namespace="toggle-master"}
-{namespace="toggle-master", app="auth-service"} |= "error"
+{k8s_namespace_name="toggle-master"}
+{service_name="auth-service"} |= "error"
 ```
 
 ### Tráfego de teste

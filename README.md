@@ -53,7 +53,9 @@ Todos os Deployments têm `requests`/`limits`, probes de `readiness`/`liveness` 
 | ConfigMap `auth-db-init-sql` | `terraform/platform` | Contém o hash SHA-256 da `SERVICE_API_KEY` gerada |
 | metrics-server, ingress-nginx | `terraform/platform` (Helm) | Eram instalados à mão; metrics do ingress alimentam o Grafana |
 | Deployments, Services, Jobs, Ingress, HPA | `aws/` (Kustomize) | Workloads — sincronizados pelo Argo CD |
-| Prometheus, Loki, Grafana, Promtail | `aws/monitoring/` + Applications Argo | Fase 4 Parte 1 — ver [`docs/MONITORING.md`](docs/MONITORING.md) |
+| Prometheus, Loki, Grafana | `aws/monitoring/` + Applications Argo | Fase 4 Parte 1 — ver [`docs/MONITORING.md`](docs/MONITORING.md) |
+| OTel Collector (DaemonSet) | `aws/monitoring/otel-collector/` + Application Argo | Fase 4 Parte 2 — ver [`docs/OTEL.md`](docs/OTEL.md) |
+| Secret `otel-apm-credentials` (license key New Relic) | `terraform/platform` | Valor sensível vem do `terraform.tfvars`, fora do Git |
 
 ## Deploy
 
@@ -146,4 +148,6 @@ kubectl -n monitoring port-forward svc/kube-prometheus-stack-grafana 3000:80
 
 ## Próximas etapas do Tech Challenge
 
-Parte 2+: OpenTelemetry Collector, APM (Datadog/New Relic), alertas e self-healing.
+- Parte 2 (OpenTelemetry Collector): [`docs/OTEL.md`](docs/OTEL.md)
+- Parte 3 (APM New Relic: Service Map e traces distribuídos): usa o mesmo pipeline do Collector
+- Parte 4 (alertas e self-healing): [`docs/ALERTING-SELF-HEALING.md`](docs/ALERTING-SELF-HEALING.md)

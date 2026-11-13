@@ -1,0 +1,158 @@
+# OpenTelemetry Collector — peça central de telemetria (Fase 4, Parte 2).
+#
+#   apps (OTel SDK) ──OTLP gRPC 4317 / HTTP 4318──┐
+#   stdout dos pods ──filelog (preset)────────────┤
+#                                                 ▼
+#                                   OTel Collector (DaemonSet)
+#        traces  ──▶ New Relic (APM)  + connector spanmetrics
+#        metrics ──▶ Prometheus (remote write)  + New Relic
+#        logs    ──▶ Loki (endpoint OTLP nativo /otlp)
+#
+# DaemonSet: um agente por nó lê /var/log/pods (substitui o Promtail — mesmo
+# número de pods, importante no limite de 17 pods/nó do t3.medium) e recebe o
+# OTLP dos pods do próprio nó (Service com internalTrafficPolicy: Local).
+# Sem credenciais AWS: nada aqui depende de IAM/IRSA (AWS Academy usa só LabRole).
+
+mode: daemonset
+
+# Nome estável do Service: otel-collector.monitoring.svc
+fullnameOverride: otel-collector
+
+image:
+  # Distribuição contrib: filelog, k8sattributes, spanmetrics, prometheusremotewrite.
+  repository: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib
+
+presets:
+  # filelog em /var/log/pods + parser de container (CRI). Exclui os logs do próprio
+  # collector para evitar loop.
+  logsCollection:
+    enabled: true
+    includeCollectorLogs: false
+  # Adiciona k8s.namespace.name, k8s.pod.name, k8s.deployment.name… em todos os
+  # pipelines (cria o ClusterRole necessário).
+  kubernetesAttributes:
+    enabled: true
+
+# Lê arquivos de log do host (root:root) — o filelog precisa rodar como root.
+securityContext:
+  runAsUser: 0
+  runAsGroup: 0
+
+service:
+  enabled: true
+  # Cada pod fala com o collector do próprio nó.
+  internalTrafficPolicy: Local
+
+ports:
+  jaeger-compact:
+    enabled: false
+  jaeger-thrift:
+    enabled: false
+  jaeger-grpc:
+    enabled: false
+  zipkin:
+    enabled: false
+
+extraEnvs:
+  # Secret criado pelo Terraform (terraform/platform, var new_relic_license_key).
+  # optional: o collector sobe mesmo sem a chave (o export para o New Relic falha
+  # com 403, mas Prometheus e Loki continuam recebendo).
+  - name: NEW_RELIC_LICENSE_KEY
+    valueFrom:
+      secretKeyRef:
+        name: otel-apm-credentials
+        key: new-relic-license-key
+        optional: true
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 300m
+    memory: 384Mi
+
+tolerations:
+  - effect: NoSchedule
+    operator: Exists
+
+config:
+  receivers:
+    # Remove receivers padrão do chart que não usamos.
+    jaeger: null
+    zipkin: null
+    prometheus: null
+
+  processors:
+    memory_limiter:
+      check_interval: 1s
+      limit_percentage: 80
+      spike_limit_percentage: 25
+    batch:
+      send_batch_size: 1024
+      timeout: 5s
+    resource:
+      attributes:
+        - key: deployment.environment
+          value: dev
+          action: upsert
+        - key: k8s.cluster.name
+          value: toggle-master-dev-eks
+          action: upsert
+
+  connectors:
+    # Gera métricas RED (calls / duration) a partir dos spans → Prometheus.
+    # Ex.: traces_span_metrics_calls_total{service_name, span_name, span_kind, status_code}
+    spanmetrics:
+      histogram:
+        explicit:
+          buckets: [5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s]
+      dimensions:
+        - name: http.response.status_code   # semconv novo (Go otelhttp)
+        - name: http.status_code            # semconv antigo (Flask)
+      metrics_flush_interval: 15s
+
+  exporters:
+    debug:
+      verbosity: basic
+
+    # Prometheus do kube-prometheus-stack com enableRemoteWriteReceiver: true.
+    prometheusremotewrite:
+      endpoint: http://kube-prometheus-stack-prometheus.monitoring.svc:9090/api/v1/write
+      resource_to_telemetry_conversion:
+        enabled: true
+      tls:
+        insecure: true
+
+    # Loki 3.x aceita OTLP nativo (requer allow_structured_metadata: true).
+    otlphttp/loki:
+      endpoint: http://loki.monitoring.svc:3100/otlp
+      tls:
+        insecure: true
+
+    # New Relic (conta US). Conta EU: https://otlp.eu01.nr-data.net
+    otlphttp/newrelic:
+      endpoint: https://otlp.nr-data.net
+      headers:
+        api-key: ${env:NEW_RELIC_LICENSE_KEY}
+      compression: gzip
+
+  service:
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [memory_limiter, resource, batch]
+        exporters: [otlphttp/newrelic, spanmetrics]
+      metrics:
+        receivers: [otlp]
+        processors: [memory_limiter, resource, batch]
+        exporters: [prometheusremotewrite, otlphttp/newrelic]
+      metrics/spanmetrics:
+        receivers: [spanmetrics]
+        processors: [memory_limiter, batch]
+        exporters: [prometheusremotewrite]
+      # O preset logsCollection acrescenta o receiver filelog aqui.
+      logs:
+        receivers: [otlp]
+        processors: [memory_limiter, resource, batch]
+        exporters: [otlphttp/loki]

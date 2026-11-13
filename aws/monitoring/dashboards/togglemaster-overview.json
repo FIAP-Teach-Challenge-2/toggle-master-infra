@@ -250,13 +250,77 @@
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 35 },
+      "id": 103,
+      "title": "Microsserviços — OpenTelemetry (spanmetrics via OTel Collector)",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 36 },
+      "id": 9,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(traces_span_metrics_calls_total{span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\"}[5m])) by (service_name)",
+          "legendFormat": "{{service_name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Request rate por serviço (OTel)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 36 },
+      "id": 10,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "(sum(rate(traces_span_metrics_calls_total{span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", status_code=\"STATUS_CODE_ERROR\"}[5m])) by (service_name) or sum(rate(traces_span_metrics_calls_total{span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\"}[5m])) by (service_name) * 0) / sum(rate(traces_span_metrics_calls_total{span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\"}[5m])) by (service_name)",
+          "legendFormat": "{{service_name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Taxa de erro por serviço (OTel)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 36 },
+      "id": 11,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(traces_span_metrics_duration_milliseconds_bucket{span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\"}[5m])) by (le, service_name))",
+          "legendFormat": "{{service_name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Latência p95 por serviço (OTel)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 44 },
       "id": 102,
-      "title": "Logs — toggle-master (Loki)",
+      "title": "Logs — toggle-master (Loki via OTel Collector)",
       "type": "row"
     },
     {
       "datasource": { "type": "loki", "uid": "${loki}" },
-      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 36 },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 45 },
       "id": 8,
       "options": {
         "dedupStrategy": "none",
@@ -270,12 +334,12 @@
       },
       "targets": [
         {
-          "expr": "{namespace=\"toggle-master\"} |= ``",
+          "expr": "{k8s_namespace_name=\"toggle-master\"} |= ``",
           "legendFormat": "",
           "refId": "A"
         }
       ],
-      "title": "Logs em tempo real (namespace toggle-master)",
+      "title": "Logs em tempo real (namespace toggle-master, via OTel Collector)",
       "type": "logs"
     }
   ],
@@ -315,5 +379,5 @@
   "timezone": "browser",
   "title": "ToggleMaster Overview",
   "uid": "togglemaster-overview",
-  "version": 1
+  "version": 2
 }

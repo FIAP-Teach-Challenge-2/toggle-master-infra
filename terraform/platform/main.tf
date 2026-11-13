@@ -131,6 +131,21 @@ resource "kubernetes_secret_v1" "alertmanager_integrations" {
   }
 }
 
+# Chave de ingestão do APM lida pelo OTel Collector (aws/monitoring/otel-collector).
+# Fica fora do Git: o valor vem do terraform.tfvars.
+resource "kubernetes_secret_v1" "otel_apm_credentials" {
+  metadata {
+    name      = "otel-apm-credentials"
+    namespace = kubernetes_namespace_v1.monitoring.metadata[0].name
+  }
+
+  type = "Opaque"
+
+  data = {
+    "new-relic-license-key" = var.new_relic_license_key
+  }
+}
+
 # ---------------------------------------------------------------------------
 # Add-ons do cluster (antes instalados manualmente)
 # ---------------------------------------------------------------------------

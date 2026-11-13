@@ -121,3 +121,10 @@ variable "discord_webhook_url" {
   default     = ""
   sensitive   = true
 }
+
+variable "new_relic_license_key" {
+  description = "License key (INGEST - LICENSE) do New Relic usada pelo OTel Collector para enviar traces e métricas ao APM. Vazio = sem export para o New Relic."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
