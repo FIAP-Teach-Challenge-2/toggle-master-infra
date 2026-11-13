@@ -113,14 +113,6 @@ scripts/otel/validate-otel.sh cluster   # no EKS: Argo, DaemonSet, secret, tráf
 FLAG=minha-flag scripts/otel/validate-otel.sh cluster   # use uma flag existente para respostas 200
 ```
 
-Testes automatizados nos serviços (rodam no CI com `go test` / `pytest`):
-
-| Serviço | Arquivo | O que garante |
-|---|---|---|
-| evaluation-service | `otel_test.go` | `traceparent` propagado ao flag-service; span CLIENT filho do `/evaluate`; `traceparent` nos MessageAttributes do SQS; erro do Redis registrado no span |
-| auth-service | `otel_test.go` | `/validate` continua o trace de quem chamou; falha injetada (500) marca o span como Error; `/health` não gera span |
-| analytics-service | `tests/test_tracing.py` | span CONSUMER com o mesmo trace_id e o produtor como pai; JSON inválido → span Error |
-
 ### Manual
 
 ```bash

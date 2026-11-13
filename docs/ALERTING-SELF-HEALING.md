@@ -49,7 +49,7 @@ As regras valem para os 5 serviços (label `exported_service` das métricas do i
    `kubectl rollout restart` faz — usando a ServiceAccount `self-healing`, que só tem `get`/`patch` nos 5 Deployments do
    namespace `toggle-master` (Role com `resourceNames`).
 4. **Cooldown de 5 min por deployment**: evita loop de restart se a causa não for resolvida pelo restart.
-5. Loga em JSON (`restart_started`, `restart_succeeded`, `restart_skipped`…) → Promtail → Loki, e posta o resultado no Discord.
+5. Loga em JSON (`restart_started`, `restart_succeeded`, `restart_skipped`…) → OTel Collector (filelog) → Loki, e posta o resultado no Discord.
 6. Se o PATCH falhar responde `502`, e o Alertmanager reenvia a notificação.
 
 ## Anti alert fatigue
@@ -138,7 +138,7 @@ kubectl -n monitoring logs -f deploy/self-healing
    ```
    T2 passa a mostrar `500`.
 2. Grafana › Alerting: `ToggleMasterHigh5xxRate` vai de **Normal → Pending → Firing** (~1–2 min).
-   Dashboard ToggleMaster Overview: painel "Taxa HTTP 5xx" sobe; Loki: `{namespace="toggle-master", app="auth-service"} |= "Chaos"`.
+   Dashboard ToggleMaster Overview: painel "Taxa HTTP 5xx" sobe; Loki: `{k8s_namespace_name="toggle-master", k8s_container_name="auth-service"} |= "Chaos"`.
 3. **PagerDuty**: incidente `[ToggleMaster] ToggleMasterHigh5xxRate em auth-service` aberto automaticamente.
 4. **Discord**: mensagem `[FIRING:1] ToggleMasterHigh5xxRate — auth-service` com resumo, valor, runbook e link da query.
 5. **Self-healing**: T3 mostra `restart_started` → `restart_succeeded`; T1 mostra pods novos subindo e os antigos
@@ -154,7 +154,7 @@ Se precisar desligar a falha manualmente: `./scripts/demo/auth-fault.sh off`.
 
 1. Verifique se o self-healing já agiu: `kubectl -n monitoring logs deploy/self-healing | grep <serviço>`.
 2. Se o alerta continuar após o restart (cooldown de 5 min), a causa não é estado do pod: veja os logs no Loki
-   (`{namespace="toggle-master", app="<serviço>"}`), dependências (RDS, Redis, auth-service) e o último deploy no Argo CD.
+   (`{k8s_namespace_name="toggle-master", k8s_container_name="<serviço>"}`), dependências (RDS, Redis, auth-service) e o último deploy no Argo CD.
 3. Rollback se o problema veio de deploy: reverta o commit de bump da imagem no `toggle-master-infra`.
 
 ## Runbook: ToggleMaster5xxRateWarning
