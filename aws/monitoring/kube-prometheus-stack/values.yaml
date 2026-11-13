@@ -153,6 +153,7 @@ prometheus:
     retention: 24h
     scrapeInterval: 30s
     evaluationInterval: 30s
+    enableRemoteWriteReceiver: true
     replicas: 1
     shards: 1
     resources:

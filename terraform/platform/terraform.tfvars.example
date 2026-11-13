@@ -24,3 +24,7 @@ install_ingress_nginx  = true
 # Nunca versione os valores reais (o repositório é público).
 # pagerduty_routing_key = ""
 # discord_webhook_url   = ""
+
+# APM (Fase 4, Parte 2/3): license key do New Relic lida pelo OTel Collector.
+# Nunca versione o valor real.
+# new_relic_license_key = ""

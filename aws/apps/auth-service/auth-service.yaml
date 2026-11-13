@@ -44,6 +44,17 @@ spec:
                   key: MASTER_KEY
             - name: CHAOS_ENABLED
               value: "true"
+            # --- OpenTelemetry: envia traces/métricas ao OTel Collector (namespace monitoring) ---
+            - name: OTEL_SERVICE_NAME
+              value: "auth-service"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector.monitoring.svc.cluster.local:4317"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "grpc"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.namespace=toggle-master,deployment.environment=dev"
+            - name: OTEL_TRACES_SAMPLER
+              value: "parentbased_always_on"
           readinessProbe:
             httpGet:
               path: /health
