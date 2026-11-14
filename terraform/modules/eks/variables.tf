@@ -177,6 +177,9 @@ variable "addons_after_nodes" {
   }))
   default = {
     coredns = {}
+    # Driver CSI do EBS: sem ele os PVCs (Prometheus/Loki) ficam Pending no K8s 1.35.
+    # Sem IRSA no AWS Academy, usa as credenciais do nó (LabRole) via IMDS.
+    aws-ebs-csi-driver = {}
   }
 }
 

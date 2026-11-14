@@ -246,6 +246,27 @@ locals {
   }
 }
 
+# StorageClass padrão (EBS CSI gp3). O cluster só traz a "gp2" in-tree, que não
+# provisiona volumes no K8s 1.35 e não é default: os PVCs do Prometheus e do Loki
+# (sem storageClassName) ficariam Pending.
+resource "kubernetes_storage_class_v1" "gp3" {
+  metadata {
+    name = "gp3"
+    annotations = {
+      "storageclass.kubernetes.io/is-default-class" = "true"
+    }
+  }
+
+  storage_provisioner    = "ebs.csi.aws.com"
+  volume_binding_mode    = "WaitForFirstConsumer"
+  allow_volume_expansion = true
+  reclaim_policy         = "Delete"
+
+  parameters = {
+    type = "gp3"
+  }
+}
+
 resource "helm_release" "argocd" {
   count = var.install_argocd ? 1 : 0
 
