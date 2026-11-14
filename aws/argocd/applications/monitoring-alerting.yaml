@@ -11,7 +11,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/FIAP-Teach-Challenge-2/toggle-master-infra.git
-    targetRevision: main
+    targetRevision: cluster/juliette-339712828566
     path: aws/monitoring/alerting
   destination:
     server: https://kubernetes.default.svc

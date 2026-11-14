@@ -18,7 +18,7 @@ spec:
         valueFiles:
           - $values/aws/monitoring/kube-prometheus-stack/values.yaml
     - repoURL: https://github.com/FIAP-Teach-Challenge-2/toggle-master-infra.git
-      targetRevision: main
+      targetRevision: cluster/juliette-339712828566
       ref: values
   destination:
     server: https://kubernetes.default.svc

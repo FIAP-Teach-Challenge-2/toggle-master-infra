@@ -8,5 +8,5 @@ resources:
 
 images:
 - name: evaluation-service
-  newName: 965145516306.dkr.ecr.us-east-1.amazonaws.com/togglemaster/evaluation-service
-  newTag: 6f555cae5ba43a8fde509a4f35032fe9116cdd03
+  newName: 339712828566.dkr.ecr.us-east-1.amazonaws.com/togglemaster/evaluation-service
+  newTag: adcf33b9555e4d0c4303dcb772292b1cfc4f59a4

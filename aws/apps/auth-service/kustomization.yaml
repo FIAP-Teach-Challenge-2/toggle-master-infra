@@ -8,5 +8,5 @@ resources:
 
 images:
 - name: auth-service
-  newName: 965145516306.dkr.ecr.us-east-1.amazonaws.com/togglemaster/auth-service
-  newTag: 62315726cd232e1ba60d5a66ef7650ceed0adb6d
+  newName: 339712828566.dkr.ecr.us-east-1.amazonaws.com/togglemaster/auth-service
+  newTag: 2b364e282fe03271193b1ff682b5786ac05369df
